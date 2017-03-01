@@ -1,36 +1,37 @@
 #include <stdio.h>
 #include <time.h>
 
-const long int M = 2;
-const long int N = 2;
-const long int O = 1;
+const long int M = 1000;
+const long int N = 1000;
+const long int O = 24;
 
 void fillMatrix(long long int *A, long long int sizeA);
 void printMatrix(long long int *A, long long int sizeA, long long int N);
-//void multiMatrices(int A[][N], int B[][O], int C[][O]);
+long long int getValue(long long int *A, long long int i, long long int j, long long int cols);
+void setValue(long long int *A, long long int i, long long int j, long long int value);
+void multiMatrices(long long int *A, long long int *B, long long int *C);
 
-int main(int argc, char const *argv[]) {
+int main(int argc, char const *argv[])
+{
   //Creting the sizes
   long long int sizeA = M * N;
   long long int sizeB = M * O;
   long long int sizeC = M * O;
 
   //Creating the matrices
-  long long int A[M*N];
-  long long int B[N*O];
-  long long int C[M*O];
+  long long int A[sizeA];
+  long long int B[sizeB];
+  long long int C[sizeC];
 
   //Filling the matrices with secuencial numbers
   fillMatrix(A, sizeA);
-  fillMatrix(B, sizeB);
-  fillMatrix(C, sizeC);
+  //fillMatrix(B, sizeB);
+  //fillMatrix(C, sizeC);
 
-  /*//Calculating the dot product of matrices A and B and saving the result in C and timing the process
-  clock_t begin = clock();
-  multiMatrices(A, B, C);
-  clock_t end = clock();
-  double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;*/
-  //printf("Time spent: %f\n", time_spent);
+  // Multiplying A and B
+  //multiMatrices(A, B, C);
+  //printMatrix(A, sizeA, N);
+  //printMatrix(C, sizeC, O);
   return 0;
 }
 
@@ -40,6 +41,19 @@ void fillMatrix(long long int *A, long long int sizeA)
     A[i] = i+1;
 }
 
+// Get the value in the position (i, j) in matrix A
+long long int getValue(long long int *A, long long int i, long long int j, long long int cols)
+{
+  return A[cols * i + j];
+}
+
+// Set the value on the position (i, j) of matrix A
+void setValue(long long int *A, long long int i, long long int j, long long int value)
+{
+  A[O * i + j] = value;
+}
+
+// Print the entire matrix A
 void printMatrix(long long int *A, long long int sizeA, long long int N)
 {
   for (long long int i = 0; i < sizeA; i++)
@@ -51,31 +65,27 @@ void printMatrix(long long int *A, long long int sizeA, long long int N)
   printf("\n");
 }
 
-
-/*
-void fillMatrixB(int B[][O])
+// Computes the multiplications between matrices A and B and stores the result on Matrix C
+void multiMatrices(long long int *A, long long int *B, long long int *C)
 {
-  int num = 1;
-  for (int i = 0; i < N; i++)
-    for (int j = 0; j < O; j++)
+  long long int temp = 0;
+  for (long long int i = 0; i < M; i++)
+  {
+    for (long long int j = 0; j < O; j++)
     {
-      B[i][j] = num;
-      num++;
-    }
-}
+      for (long long int k = 0; k < N; k++)
+      {
+        temp = temp + getValue(A, i, k, N) * getValue(B, k, j, O);
+        //printf("A[%lld][%lld] = %lld\n", i, k, getValue(A, i, k));
+        //printf("B[%lld][%lld] = %lld\n", k, j, getValue(B, k, j));
 
-void multiMatrices(int A[][N], int B[][O], int C[][O])
-{
-  int temp = 0;
-  for (int i = 0; i < M; i++) {
-    for (int j = 0; j < O; j++) {
-      for (int k = 0; k < N; k++) {
-        temp = temp + A[i][k] * B[j][k];
+        //printf("A[%lld][%lld] * B[%lld][%lld] = %lld\n", i, k, k, j, temp);
+        //printf("%lld, %lld, %lld\n", i, j, k);
+        //printf("%lld * %lld \n", getValue(A, i, k), getValue(B, k, j));
+        //printf("%lld \n", temp);
       }
-      C[i][j] = temp;
+      setValue(C, i, j, temp);
       temp = 0;
     }
   }
 }
-
-*/
