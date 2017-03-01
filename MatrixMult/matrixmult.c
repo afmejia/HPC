@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <time.h>
 
-const long int M = 1000;
-const long int N = 1000;
+const long int M = 100;
+const long int N = 100;
 const long int O = 24;
 
 void fillMatrix(long long int *A, long long int sizeA);
