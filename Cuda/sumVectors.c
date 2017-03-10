@@ -1,3 +1,4 @@
+# include <cuda.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -41,6 +42,8 @@ void printVector(int *V) {
 
 
 void sumVectors(int *A, int *B, int *C) {
+  int n = size * sizeof(int);
+  int *d_A, *d_B, *d_C;
     for (int i = 0; i < size; i++)
       C[i] = A[i] + B[i];
 }
