@@ -22,8 +22,8 @@ int main(int argc, char const *argv[]) {
   // printVector(B);
   //printVector(C);
   free(A);
-  //free(B);
-  //  free(C);
+  free(B);
+  free(C);
   return 0;
 }
 
