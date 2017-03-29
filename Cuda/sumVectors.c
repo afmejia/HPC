@@ -1,17 +1,16 @@
-# include <cuda.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 const int size = 10;
 
-void fillVectors(int *A);
-void printVector(int *V);
-void sumVectors(int *A, int *B, int *C);
+void fillVectors(float *A);
+void printVector(float *V);
+void sumVectors(float *A, float *B, float *C);
 
 int main(int argc, char const *argv[]) {
-  int *A = (int *) malloc(size * sizeof(int));
-  int *B = (int *) malloc(size * sizeof(int));
-  int *C = (int *) malloc(size * sizeof(int));
+  float *A = (float *) malloc(size * sizeof(float));
+  float *B = (float *) malloc(size * sizeof(float));
+  float *C = (float *) malloc(size * sizeof(float));
 //  int *C;
 //  B = (int *) malloc(size);
 //  C = (int *) malloc(size);
@@ -28,22 +27,22 @@ int main(int argc, char const *argv[]) {
 }
 
 
-void fillVectors(int *A) {
+void fillVectors(float *A) {
   for (int i = 0; i < size; i++)  {
     A[i] = i + 1;
   }
 }
 
-void printVector(int *V) {
+void printVector(float *V) {
   for (int i = 0; i < size; i++)
-    printf("%d ", V[i]);
+    printf("%f ", V[i]);
   printf("\n");
 }
 
 
-void sumVectors(int *A, int *B, int *C) {
-  int n = size * sizeof(int);
-  int *d_A, *d_B, *d_C;
+void sumVectors(float *A, float *B, float *C) {
+  //int n = size * sizeof(float);
+  //int *d_A, *d_B, *d_C;
     for (int i = 0; i < size; i++)
       C[i] = A[i] + B[i];
 }
