@@ -41,6 +41,13 @@ void printVector(float *V) {
   printf("\n");
 }
 
+__global__
+void vecAddKernel(float *A, float *B, float *C)
+{
+  int i = threadIdx.x + blockDim.x * blockIdx.x;
+  if (i < size)
+    C[i] = A[i] + B[i];
+}
 
 void sumVectors(float *A, float *B, float *C) {
   int n = size * sizeof(float);
@@ -65,12 +72,4 @@ void sumVectors(float *A, float *B, float *C) {
   cudaFree(d_A);
   cudaFree(d_B);
   cudaFree(d_C);
-}
-
-__global__
-void vecAddKernel(float *A, float *B, float *C)
-{
-  int i = threadIdx.x + blockDim.x * blockIdx.x;
-  if (i < n)
-    C[i] = A[i] + B[i];
 }
