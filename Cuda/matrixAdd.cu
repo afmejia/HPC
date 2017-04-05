@@ -1,3 +1,4 @@
+#include <cuda.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -33,7 +34,31 @@ void fillMatrix(float *A)
 void addMatrices(float *h_A, float *h_B, float *h_C)
 {
     int size = N * N;
-    //int d_size = N * N * sizeof(float);
+    int d_size = N * N * sizeof(float);}
+    float *d_A, *d_B, *d_C;
+
+    // Allocate device memory for A, B, and C
+    // copy h_A and h_B to device memory
+    cudaError_t err = cudaMalloc((void**) &d_A, size);
+    if (err != cudaSuccess)
+    {
+      printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
+      exit(EXIT_FAILURE);
+    }
+    cudaMemcpy(d_A, h_A, size, cudaMemcpyHostToDevice);
+    cudaMalloc((void**) &d_B, size);
+    cudaMemcpy(d_B, h_B, size, cudaMemcpyHostToDevice);
+    cudaMalloc((void**) &d_C, size);
+
+    // Kernel launch code - to have the device to perform the actual matrix addition
+
+    // copy C from the device memory
+    cudaMemcpy(h_C, d_C, size, cudaMemcpyDeviceToHost);
+
+    // Free device vector (which represents our matrices)
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
 
     for (int i = 0; i < size; i++)
     {
