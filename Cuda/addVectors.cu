@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-const int size = 10;
+const int size = 1000;
 
 void fillVectors(float *A);
 void printVector(float *V);
@@ -37,7 +37,7 @@ void fillVectors(float *A) {
 
 void printVector(float *V) {
   for (int i = 0; i < size; i++)
-    printf("%f ", V[i]);
+    printf("%d ", (int)V[i]);
   printf("\n");
 }
 
@@ -73,3 +73,4 @@ void sumVectors(float *A, float *B, float *C) {
   cudaFree(d_B);
   cudaFree(d_C);
 }
+
