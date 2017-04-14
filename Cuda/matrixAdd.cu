@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define N 20
+#define N 1000
 
 void addMatrices(float *h_A, float *h_B, float *h_C);
 void fillMatrix(float *h_A);
@@ -26,10 +26,15 @@ __global__
 void matAddKernel(float *d_A, float *d_B, float *d_C, int size)
 {
   int i = threadIdx.x + blockDim.x * blockIdx.x;
+  int element;
   if (i < size)
   {
-    d_C[i] = d_A[i] + d_B[i];
-    //printf("%d\t", (int)d_C[i]);
+    for (int j = 0; j < size; j++)
+    {
+      element = i * size + j;
+      d_C[element] = d_A[element] + d_B[element];
+      //printf("Element %d from thread %d\n", element, i);
+    }
   }
 }
 
@@ -74,7 +79,7 @@ void addMatrices(float *h_A, float *h_B, float *h_C)
     }
 
     // Kernel launch code - to have the device to perform the actual matrix addition
-    matAddKernel<<<ceil((size)/256.0), 256>>>(d_A, d_B, d_C, size);
+    matAddKernel<<<ceil((N)/256.0), 256>>>(d_A, d_B, d_C, N);
 
     // copy C from the device memory
     cudaMemcpy(h_C, d_C, d_size, cudaMemcpyDeviceToHost);
