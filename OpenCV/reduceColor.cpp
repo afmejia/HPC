@@ -37,7 +37,7 @@ int main (int argc, char** argv)
   Mat I, J;
 
   if (argc == 4 && !strcmp(argv[3], "[G]"))
-    I = imread(argv[1], IMREAD_GRAYSCALE)
+    I = imread(argv[1], IMREAD_GRAYSCALE);
   else
     I = imread(argv[1], IMREAD_COLOR);
 
@@ -60,7 +60,7 @@ int main (int argc, char** argv)
 
   uchar table[256];
 
-  for (int i = 0, i < 256, i++)
+  for (int i = 0; i < 256; i++)
     table[i] = (uchar)(divideWith * (i / divideWith));
 
   const int times = 100;
@@ -124,6 +124,11 @@ int main (int argc, char** argv)
   t /= times;
 
   cout << "Time of reducing with the LUT function (averaged for " << times << " runs): " << t << " milliseconds."<< endl;
+
+  namedWindow("Color reduced", WINDOW_AUTOSIZE);
+  imshow("landscape", J);
+  waitKey(0);
+
   return 0;
 }
 
@@ -136,7 +141,7 @@ Mat& ScanImageAndReduceC(Mat& I, const uchar* const table)
   int nRows = I.rows;
   int nCols = I.cols * channels;
 
-  if (I.isContinuius())
+  if (I.isContinuous())
   {
     nCols *= nRows;
     nRows = 1;
@@ -167,7 +172,7 @@ Mat& ScanImageAndReduceIterator(Mat& I, const uchar* const table)
       case 1:
         {
             MatIterator_<uchar> it, end;
-            for(it = I.begin<uchar>(), end = I.end<uchar>(); it != end; ++it
+            for(it = I.begin<uchar>(), end = I.end<uchar>(); it != end; ++it)
               *it = table[*it];
             break;
         }
@@ -220,3 +225,4 @@ Mat& ScanImageAndReduceRandomAccess(Mat& I, const uchar* const table)
   }
   return I;
 }
+

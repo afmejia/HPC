@@ -1,4 +1,5 @@
 #include <cuda.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -25,7 +26,26 @@ int main(int argc, char const *argv[]) {
 
   // Print the result vector
   printVector(h_A, N);
+
+  //Free host memory
+  free(h_A);
+  free(h_B);
+  free(h_C);
+
   return 0;
+}
+
+__global__
+void dotProduct(float *d_B, float *d_C, float *d_A, int n)
+{
+  float temp = 0;
+  int i = threadIdx.x + blockDim.x * blockIdx.x;
+  if (i < n)
+  {
+    for (int j = 0; j < n; j++)
+      temp = temp + (d_B[i * n + j] * d_C[j]);
+    d_A[i] = temp;
+  }
 }
 
 void fillMatrix(float *h_A, int size)
@@ -53,13 +73,13 @@ void mult(float *h_B, float *h_C, float *h_A, int n)
   }
   cudaMemcpy(d_B, h_B, B_size, cudaMemcpyHostToDevice);
 
-  err = cudaMalloc((void **) &d_C, c_Size);
+  err = cudaMalloc((void **) &d_C, C_size);
   if (err != cudaSuccess)
   {
     printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
     exit(EXIT_FAILURE);
   }
-  cudaMemcpy(d_C, h_C, c_size, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_C, h_C, C_size, cudaMemcpyHostToDevice);
 
   err = cudaMalloc((void **) &d_A, C_size);
   if (err != cudaSuccess)
@@ -68,23 +88,16 @@ void mult(float *h_B, float *h_C, float *h_A, int n)
     exit(EXIT_FAILURE);
   }
 
-  // TODO
   // Launch kernel for each row
-  // Test everything
+  dotProduct<<<ceil(n / 256.0), 256>>>(d_B, d_C, d_A, n);
 
+  // Copy the result vector from devive to host
+  cudaMemcpy(h_A, d_A, C_size, cudaMemcpyDeviceToHost);
 
-  float temp = 0;
-  int j = 0;
-  for (int i = 0; i < n; i++)
-  {
-    for (int k = 0; k < n; k++)
-    {
-      temp = temp + h_B[j] * h_C[k];
-      j++;
-    }
-    h_A[i] = temp;
-    temp = 0;
-  }
+  // Free device memory
+  cudaFree(d_A);
+  cudaFree(d_C);
+  cudaFree(d_B);
 }
 
 void printVector(float *h_A, int size)
@@ -93,3 +106,4 @@ void printVector(float *h_A, int size)
     printf("%d ", (int)h_A[i]);
   printf("\n");
 }
+
