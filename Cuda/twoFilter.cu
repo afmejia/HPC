@@ -31,10 +31,10 @@ int main(int argc, char const *argv[]) {
 
         //Show image
         /*namedWindow("Original image", WINDOW_AUTOSIZE);
-        imshow("landscape", image);
-        //namedWindow("Filtered image", WINDOW_AUTOSIZE);
-        imshow("filtered landscape", result);
-        waitKey(0);*/
+           imshow("landscape", image);
+           //namedWindow("Filtered image", WINDOW_AUTOSIZE);
+           imshow("filtered landscape", result);
+           waitKey(0);*/
         return 0;
 }
 
@@ -69,7 +69,7 @@ Mat& gpuFilter(Mat& image)
 
         // Flat host image
         uchar* h_img;
-        h_img = img.ptr<uchar>(0);
+        h_img = image.ptr<uchar>(0);
 
         // Create device image
         uchar* d_img;
@@ -78,12 +78,18 @@ Mat& gpuFilter(Mat& image)
         cudaError_t err = cudaMalloc((void **) &d_img, im_size);
         if (err != cudaSuccess)
         {
-          cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
-          exit(EXIT_FAILURE);
+                cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
+                exit(EXIT_FAILURE);
         }
 
         // Copy image from host to device
         cudaMemcpy(d_img, h_img, im_size, cudaMemcpyHostToDevice);
+
+        //TODO Launch the kernel with the correct number of blocks and threads.
+        // Launch the Kernel
+        /*dim3 dimGrid(2, 2, 1);
+        dim3 dimBlock(16, 16, 1);
+        //pictureKernel<<<*/
 
         cout << "Success" << endl;
         cudaFree(d_img);
