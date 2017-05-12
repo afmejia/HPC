@@ -1,11 +1,12 @@
 #include <opencv2/opencv.hpp>
+#include <cuda.h>
 #include <iostream>
 
 using namespace cv;
 using namespace std;
 
 Mat& filter(Mat& image);
-Mat& gpuFilter(Mat& image);
+Mat& gpuFilter(Mat& image, Mat& result);
 
 int main(int argc, char const *argv[]) {
         // Load the image
@@ -26,16 +27,30 @@ int main(int argc, char const *argv[]) {
         }
 
         // Apply filter
-        Mat result = image.clone();
-        result = gpuFilter(result);
+        Mat result;
+        Mat clone_i = image.clone();
+        result = gpuFilter(image, clone_i);
 
         //Show image
-        /*namedWindow("Original image", WINDOW_AUTOSIZE);
-           imshow("landscape", image);
-           //namedWindow("Filtered image", WINDOW_AUTOSIZE);
-           imshow("filtered landscape", result);
-           waitKey(0);*/
+        namedWindow("Original image", WINDOW_AUTOSIZE);
+        imshow("landscape", image);
+        //namedWindow("Filtered image", WINDOW_AUTOSIZE);
+        imshow("filtered landscape", result);
+        waitKey(0);
         return 0;
+}
+
+__global__ void pictureKernel(uchar* d_img, int rows, int cols)
+{
+        // Calculate the row # of the d_img element to process
+        int row = blockIdx.y * blockDim.y + threadIdx.y;
+
+        // Calculate the column # of the d_img element to process
+        int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+        // Each thread computes one element of d_img if in range
+        if ((row < rows) && (col < cols))
+                d_img[row * cols + col] = 2 * d_img[row * cols + col];
 }
 
 Mat& filter(Mat& image)
@@ -56,7 +71,7 @@ Mat& filter(Mat& image)
         return image;
 }
 
-Mat& gpuFilter(Mat& image)
+Mat& gpuFilter(Mat& image, Mat& result)
 {
         // Accept only char type matrices
         CV_Assert(image.depth() == CV_8U);
@@ -69,7 +84,7 @@ Mat& gpuFilter(Mat& image)
 
         // Flat host image
         uchar* h_img;
-        h_img = image.ptr<uchar>(0);
+        h_img = result.ptr<uchar>(0);
 
         // Create device image
         uchar* d_img;
@@ -82,43 +97,28 @@ Mat& gpuFilter(Mat& image)
                 exit(EXIT_FAILURE);
         }
 
+        /*err = cudaMalloc((void **) &d_filteredImg, im_size);
+           if (err != cudaSuccess)
+           {
+                cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
+                exit(EXIT_FAILURE);
+           }*/
+
         // Copy image from host to device
         cudaMemcpy(d_img, h_img, im_size, cudaMemcpyHostToDevice);
 
-        //TODO Launch the kernel with the correct number of blocks and threads.
         // Launch the Kernel
-        /*dim3 dimGrid(2, 2, 1);
+        dim3 dimGrid(ceil(cols / 256.0), ceil(rows / 256.0), 1);
         dim3 dimBlock(16, 16, 1);
-        //pictureKernel<<<*/
+        pictureKernel<<<dimGrid, dimBlock>>>(d_img, rows, cols);
+
+        // Copy result image from device to host
+        //TODO Correct the kernel, for some reason the filter is not well
+        cudaMemcpy(h_img, d_img, im_size, cudaMemcpyDeviceToHost);
 
         cout << "Success" << endl;
         cudaFree(d_img);
 
-
-
-        // Create iterator and iterate over the whole image
-        MatIterator_<Vec3b> it, end;
-
-        for (it = image.begin<Vec3b>(), end = image.end<Vec3b>(); it != end; ++it)
-        {
-                (*it)[0] = (*it)[0] * 2;
-                (*it)[1] = (*it)[1] * 2;
-                (*it)[2] = (*it)[2] * 2;
-        }
-
-        return image;
+        return result;
 }
-
-/*__global__ void PictureKernell(float* d_Pin, float* d_Pout, int n, int m)
-   {
-   // Calculate the row # of the d_Pin and d_Pout element to process
-   int Row = blockIdx.y * blockDim.y + threadIdx.y;
-
-   // Calculate the column # of the d_Pin and d_Pout element to process
-   int Col = blockIdx.x * blockDim.x + threadIdx.x;
-
-   //each thread computes one element of d_Pout if in range
-   if ((Row < m) && (Col < n))
-    d_Pout[Row * n + Col] = 2 d_Pin[Row * n + Col];
-   }*/
 
