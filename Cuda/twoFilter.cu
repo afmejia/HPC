@@ -6,7 +6,7 @@ using namespace cv;
 using namespace std;
 
 Mat& filter(Mat& image);
-Mat& gpuFilter(Mat& image, Mat& result);
+Mat gpuFilter(Mat& image);
 
 int main(int argc, char const *argv[]) {
         // Load the image
@@ -28,8 +28,7 @@ int main(int argc, char const *argv[]) {
 
         // Apply filter
         Mat result;
-        Mat clone_i = image.clone();
-        result = gpuFilter(image, clone_i);
+        result = gpuFilter(image);
 
         //Show image
         namedWindow("Original image", WINDOW_AUTOSIZE);
@@ -40,7 +39,7 @@ int main(int argc, char const *argv[]) {
         return 0;
 }
 
-__global__ void pictureKernel(uchar* d_img, int rows, int cols)
+__global__ void pictureKernel(uchar* d_img_in, uchar* d_img_out, int rows, int cols)
 {
         // Calculate the row # of the d_img element to process
         int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -50,7 +49,7 @@ __global__ void pictureKernel(uchar* d_img, int rows, int cols)
 
         // Each thread computes one element of d_img if in range
         if ((row < rows) && (col < cols))
-                d_img[row * cols + col] = 2 * d_img[row * cols + col];
+                d_img_out[row * cols + col] = 2 * d_img_in[row * cols + col];
 }
 
 Mat& filter(Mat& image)
@@ -71,7 +70,7 @@ Mat& filter(Mat& image)
         return image;
 }
 
-Mat& gpuFilter(Mat& image, Mat& result)
+Mat gpuFilter(Mat& image)
 {
         // Accept only char type matrices
         CV_Assert(image.depth() == CV_8U);
@@ -83,42 +82,53 @@ Mat& gpuFilter(Mat& image, Mat& result)
         int im_size = cols * rows * sizeof(uchar);
 
         // Flat host image
-        uchar* h_img;
-        h_img = result.ptr<uchar>(0);
+        uchar* h_img = (uchar*) image.data;
 
-        // Create device image
-        uchar* d_img;
+        // Create device images and result host image
+        uchar* d_img_in;
+        uchar* d_img_out;
+        uchar* h_result = (uchar*) malloc(im_size);
 
-        // Allocate device memory for the image
-        cudaError_t err = cudaMalloc((void **) &d_img, im_size);
+        // Allocate device memory for the images
+        cudaError_t err = cudaMalloc((void **) &d_img_in, im_size);
         if (err != cudaSuccess)
         {
                 cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
                 exit(EXIT_FAILURE);
         }
 
-        /*err = cudaMalloc((void **) &d_filteredImg, im_size);
-           if (err != cudaSuccess)
-           {
+        err = cudaMalloc((void**) &d_img_out, im_size);
+        if (err != cudaSuccess)
+        {
                 cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
                 exit(EXIT_FAILURE);
-           }*/
+        }
 
         // Copy image from host to device
-        cudaMemcpy(d_img, h_img, im_size, cudaMemcpyHostToDevice);
+        err = cudaMemcpy(d_img_in, h_img, im_size, cudaMemcpyHostToDevice);
+        if (err != cudaSuccess)
+        {
+                cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
+                exit(EXIT_FAILURE);
+        }
 
         // Launch the Kernel
         dim3 dimGrid(ceil(cols / 256.0), ceil(rows / 256.0), 1);
         dim3 dimBlock(16, 16, 1);
-        pictureKernel<<<dimGrid, dimBlock>>>(d_img, rows, cols);
+        pictureKernel<<<dimGrid, dimBlock>>>(d_img_in, d_img_out, rows, cols);
 
         // Copy result image from device to host
-        //TODO Correct the kernel, for some reason the filter is not well
-        cudaMemcpy(h_img, d_img, im_size, cudaMemcpyDeviceToHost);
+        err = cudaMemcpy(h_result, d_img_out, im_size, cudaMemcpyDeviceToHost);
+        if (err != cudaSuccess)
+        {
+                cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
+                exit(EXIT_FAILURE);
+        }
+        Mat result(rows, cols, CV_8UC3, (void*) h_result);
 
         cout << "Success" << endl;
-        cudaFree(d_img);
-
+        cudaFree(d_img_in);
+        cudaFree(d_img_out);
         return result;
 }
 
