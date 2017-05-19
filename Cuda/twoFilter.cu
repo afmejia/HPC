@@ -27,19 +27,18 @@ int main(int argc, char const *argv[]) {
         }
 
         // Apply filter
-        Mat result;
-        result = gpuFilter(image);
+        Mat result = image.clone();
+        //resultCpu = filter(result);
+        Mat resultGpu = gpuFilter(result);
 
         //Show image
-        namedWindow("Original image", WINDOW_AUTOSIZE);
         imshow("landscape", image);
-        //namedWindow("Filtered image", WINDOW_AUTOSIZE);
-        imshow("filtered landscape", result);
+	imshow("filtered landscape", resultGpu);
         waitKey(0);
         return 0;
 }
 
-__global__ void pictureKernel(uchar* d_img_in, uchar* d_img_out, int rows, int cols)
+/*__global__ void pictureKernel(uchar* d_img_in, uchar* d_img_out, int rows, int cols)
 {
         // Calculate the row # of the d_img element to process
         int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -50,7 +49,7 @@ __global__ void pictureKernel(uchar* d_img_in, uchar* d_img_out, int rows, int c
         // Each thread computes one element of d_img if in range
         if ((row < rows) && (col < cols))
                 d_img_out[row * cols + col] = 2 * d_img_in[row * cols + col];
-}
+}*/
 
 Mat& filter(Mat& image)
 {
@@ -62,9 +61,9 @@ Mat& filter(Mat& image)
 
         for (it = image.begin<Vec3b>(), end = image.end<Vec3b>(); it != end; ++it)
         {
-                (*it)[0] = (*it)[0] * 2;
-                (*it)[1] = (*it)[1] * 2;
-                (*it)[2] = (*it)[2] * 2;
+                (*it)[0] = - (*it)[0] - 2;
+                (*it)[1] = - (*it)[1] - 2;
+                (*it)[2] = - (*it)[2] - 2;
         }
 
         return image;
@@ -75,16 +74,43 @@ Mat gpuFilter(Mat& image)
         // Accept only char type matrices
         CV_Assert(image.depth() == CV_8U);
 
-        // Define image size in the device memory
-        int channels = image.channels();
-        int cols = image.cols * channels;
-        int rows = image.rows;
-        int im_size = cols * rows * sizeof(uchar);
+        // Define image size in host memory
+	Size size = image.size();
+	int channels = image.channels();
+	int width = size.width;
+	int height = size.height;
+	int im_size = width * height * channels * sizeof(uchar);
 
+
+	// Create host image
+	uchar* h_img = (uchar*) malloc(im_size);
+	h_img = image.data;
+	Mat result;
+	result.create(size, CV_8UC3);
+	result.data = h_img;
+
+	// Sequencial filter
+	for(int i = 0; i < im_size; i++)
+	{
+		h_img[i] = 2 * h_img[i];
+	}
+	
+	//TODO: Finally the fucking kernel with the two filter
+	
         // Flat host image
-        uchar* h_img = (uchar*) image.data;
+        //uchar* h_img = (uchar*) image.data;
+	//Mat result(rows, cols, CV_8UC3, (void*) h_img);
 
-        // Create device images and result host image
+	// Sequencial filter using sizeof
+	/*int size = sizeof(h_img);
+	for(int i = 0; i < size; i++)
+	{
+		h_img[i] = h_img[i] * 2;
+	}*/
+
+	//Mat result(rows, cols, CV_8UC3, (void*) h_img);
+
+        /*// Create device images and result host image
         uchar* d_img_in;
         uchar* d_img_out;
         uchar* h_result = (uchar*) malloc(im_size);
@@ -128,7 +154,8 @@ Mat gpuFilter(Mat& image)
 
         cout << "Success" << endl;
         cudaFree(d_img_in);
-        cudaFree(d_img_out);
+        cudaFree(d_img_out);*/
         return result;
 }
+
 
