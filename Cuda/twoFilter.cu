@@ -1,11 +1,12 @@
 #include <opencv2/opencv.hpp>
+#include <cuda.h>
 #include <iostream>
 
 using namespace cv;
 using namespace std;
 
 Mat& filter(Mat& image);
-Mat& gpuFilter(Mat& image);
+Mat gpuFilter(Mat& image);
 
 int main(int argc, char const *argv[]) {
         // Load the image
@@ -27,16 +28,28 @@ int main(int argc, char const *argv[]) {
 
         // Apply filter
         Mat result = image.clone();
-        result = gpuFilter(result);
+        //resultCpu = filter(result);
+        Mat resultGpu = gpuFilter(result);
 
         //Show image
-        /*namedWindow("Original image", WINDOW_AUTOSIZE);
-           imshow("landscape", image);
-           //namedWindow("Filtered image", WINDOW_AUTOSIZE);
-           imshow("filtered landscape", result);
-           waitKey(0);*/
+        imshow("landscape", image);
+	imshow("filtered landscape", resultGpu);
+        waitKey(0);
         return 0;
 }
+
+/*__global__ void pictureKernel(uchar* d_img_in, uchar* d_img_out, int rows, int cols)
+{
+        // Calculate the row # of the d_img element to process
+        int row = blockIdx.y * blockDim.y + threadIdx.y;
+
+        // Calculate the column # of the d_img element to process
+        int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+        // Each thread computes one element of d_img if in range
+        if ((row < rows) && (col < cols))
+                d_img_out[row * cols + col] = 2 * d_img_in[row * cols + col];
+}*/
 
 Mat& filter(Mat& image)
 {
@@ -48,34 +61,69 @@ Mat& filter(Mat& image)
 
         for (it = image.begin<Vec3b>(), end = image.end<Vec3b>(); it != end; ++it)
         {
-                (*it)[0] = (*it)[0] * 2;
-                (*it)[1] = (*it)[1] * 2;
-                (*it)[2] = (*it)[2] * 2;
+                (*it)[0] = - (*it)[0] - 2;
+                (*it)[1] = - (*it)[1] - 2;
+                (*it)[2] = - (*it)[2] - 2;
         }
 
         return image;
 }
 
-Mat& gpuFilter(Mat& image)
+Mat gpuFilter(Mat& image)
 {
         // Accept only char type matrices
         CV_Assert(image.depth() == CV_8U);
 
-        // Define image size in the device memory
-        int channels = image.channels();
-        int cols = image.cols * channels;
-        int rows = image.rows;
-        int im_size = cols * rows * sizeof(uchar);
+        // Define image size in host memory
+	Size size = image.size();
+	int channels = image.channels();
+	int width = size.width;
+	int height = size.height;
+	int im_size = width * height * channels * sizeof(uchar);
 
+
+	// Create host image
+	uchar* h_img = (uchar*) malloc(im_size);
+	h_img = image.data;
+	Mat result;
+	result.create(size, CV_8UC3);
+	result.data = h_img;
+
+	// Sequencial filter
+	for(int i = 0; i < im_size; i++)
+	{
+		h_img[i] = 2 * h_img[i];
+	}
+	
+	//TODO: Finally the fucking kernel with the two filter
+	
         // Flat host image
-        uchar* h_img;
-        h_img = image.ptr<uchar>(0);
+        //uchar* h_img = (uchar*) image.data;
+	//Mat result(rows, cols, CV_8UC3, (void*) h_img);
 
-        // Create device image
-        uchar* d_img;
+	// Sequencial filter using sizeof
+	/*int size = sizeof(h_img);
+	for(int i = 0; i < size; i++)
+	{
+		h_img[i] = h_img[i] * 2;
+	}*/
 
-        // Allocate device memory for the image
-        cudaError_t err = cudaMalloc((void **) &d_img, im_size);
+	//Mat result(rows, cols, CV_8UC3, (void*) h_img);
+
+        /*// Create device images and result host image
+        uchar* d_img_in;
+        uchar* d_img_out;
+        uchar* h_result = (uchar*) malloc(im_size);
+
+        // Allocate device memory for the images
+        cudaError_t err = cudaMalloc((void **) &d_img_in, im_size);
+        if (err != cudaSuccess)
+        {
+                cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
+                exit(EXIT_FAILURE);
+        }
+
+        err = cudaMalloc((void**) &d_img_out, im_size);
         if (err != cudaSuccess)
         {
                 cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
@@ -83,42 +131,31 @@ Mat& gpuFilter(Mat& image)
         }
 
         // Copy image from host to device
-        cudaMemcpy(d_img, h_img, im_size, cudaMemcpyHostToDevice);
-
-        //TODO Launch the kernel with the correct number of blocks and threads.
-        // Launch the Kernel
-        /*dim3 dimGrid(2, 2, 1);
-        dim3 dimBlock(16, 16, 1);
-        //pictureKernel<<<*/
-
-        cout << "Success" << endl;
-        cudaFree(d_img);
-
-
-
-        // Create iterator and iterate over the whole image
-        MatIterator_<Vec3b> it, end;
-
-        for (it = image.begin<Vec3b>(), end = image.end<Vec3b>(); it != end; ++it)
+        err = cudaMemcpy(d_img_in, h_img, im_size, cudaMemcpyHostToDevice);
+        if (err != cudaSuccess)
         {
-                (*it)[0] = (*it)[0] * 2;
-                (*it)[1] = (*it)[1] * 2;
-                (*it)[2] = (*it)[2] * 2;
+                cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
+                exit(EXIT_FAILURE);
         }
 
-        return image;
+        // Launch the Kernel
+        dim3 dimGrid(ceil(cols / 256.0), ceil(rows / 256.0), 1);
+        dim3 dimBlock(16, 16, 1);
+        pictureKernel<<<dimGrid, dimBlock>>>(d_img_in, d_img_out, rows, cols);
+
+        // Copy result image from device to host
+        err = cudaMemcpy(h_result, d_img_out, im_size, cudaMemcpyDeviceToHost);
+        if (err != cudaSuccess)
+        {
+                cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
+                exit(EXIT_FAILURE);
+        }
+        Mat result(rows, cols, CV_8UC3, (void*) h_result);
+
+        cout << "Success" << endl;
+        cudaFree(d_img_in);
+        cudaFree(d_img_out);*/
+        return result;
 }
 
-/*__global__ void PictureKernell(float* d_Pin, float* d_Pout, int n, int m)
-   {
-   // Calculate the row # of the d_Pin and d_Pout element to process
-   int Row = blockIdx.y * blockDim.y + threadIdx.y;
-
-   // Calculate the column # of the d_Pin and d_Pout element to process
-   int Col = blockIdx.x * blockDim.x + threadIdx.x;
-
-   //each thread computes one element of d_Pout if in range
-   if ((Row < m) && (Col < n))
-    d_Pout[Row * n + Col] = 2 d_Pin[Row * n + Col];
-   }*/
 
