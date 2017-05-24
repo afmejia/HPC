@@ -1,12 +1,14 @@
 #include <opencv2/opencv.hpp>
 #include <cuda.h>
 #include <iostream>
+#include <math.h>
+#include <stdio.h>
 
 using namespace cv;
 using namespace std;
 
 Mat& filter(Mat& image);
-Mat gpuFilter(Mat& image);
+Mat& gpuFilter(Mat& image, uchar* h_img, uchar* h_imgOut, Size size, int im_size);
 
 int main(int argc, char const *argv[]) {
         // Load the image
@@ -26,15 +28,28 @@ int main(int argc, char const *argv[]) {
                 return -1;
         }
 
+        // Define image size in host memory
+        Size size = image.size();
+        int channels = image.channels();
+        int width = size.width;
+        int height = size.height;
+        int im_size = width * height * channels * sizeof(uchar);
+
+        //Create host image container
+        uchar* h_img = (uchar*) malloc(im_size);
+        uchar* h_imgOut = (uchar*) malloc(im_size);
+
         // Apply filter
         Mat result = image.clone();
         //resultCpu = filter(result);
-        Mat resultGpu = gpuFilter(result);
+        Mat resultGpu = gpuFilter(result, h_img, h_imgOut, size, im_size);
 
         //Show image
         imshow("landscape", image);
-	imshow("filtered landscape", resultGpu);
+        imshow("filtered landscape", resultGpu);
         waitKey(0);
+        free(h_img);
+        free(h_imgOut);
         return 0;
 }
 
@@ -61,101 +76,67 @@ Mat& filter(Mat& image)
 
         for (it = image.begin<Vec3b>(), end = image.end<Vec3b>(); it != end; ++it)
         {
-                (*it)[0] = - (*it)[0] - 2;
-                (*it)[1] = - (*it)[1] - 2;
-                (*it)[2] = - (*it)[2] - 2;
+                (*it)[0] = -(*it)[0] - 2;
+                (*it)[1] = -(*it)[1] - 2;
+                (*it)[2] = -(*it)[2] - 2;
         }
 
         return image;
 }
 
-Mat gpuFilter(Mat& image)
+Mat& gpuFilter(Mat& image, uchar* h_img, uchar* h_imgOut, Size size, int im_size)
 {
         // Accept only char type matrices
         CV_Assert(image.depth() == CV_8U);
 
-        // Define image size in host memory
-	Size size = image.size();
-	int channels = image.channels();
-	int width = size.width;
-	int height = size.height;
-	int im_size = width * height * channels * sizeof(uchar);
+        // Create host image
+        h_img = image.data;
+        //Mat result;
+        //result.create(size, CV_8UC3);
+        //result.data = h_imgOut;
 
+        // Sequencial filter
+        for(int i = 0; i < im_size; i++)
+           {
+           h_img[i] = 2 * h_img[i];
+           }
 
-	// Create host image
-	uchar* h_img = (uchar*) malloc(im_size);
-	h_img = image.data;
-	Mat result;
-	result.create(size, CV_8UC3);
-	result.data = h_img;
-
-	// Sequencial filter
-	for(int i = 0; i < im_size; i++)
-	{
-		h_img[i] = 2 * h_img[i];
-	}
-	
-	//TODO: Finally the fucking kernel with the two filter
-	
-        // Flat host image
-        //uchar* h_img = (uchar*) image.data;
-	//Mat result(rows, cols, CV_8UC3, (void*) h_img);
-
-	// Sequencial filter using sizeof
-	/*int size = sizeof(h_img);
-	for(int i = 0; i < size; i++)
-	{
-		h_img[i] = h_img[i] * 2;
-	}*/
-
-	//Mat result(rows, cols, CV_8UC3, (void*) h_img);
-
-        /*// Create device images and result host image
-        uchar* d_img_in;
-        uchar* d_img_out;
-        uchar* h_result = (uchar*) malloc(im_size);
-
-        // Allocate device memory for the images
-        cudaError_t err = cudaMalloc((void **) &d_img_in, im_size);
+        // Allocate device memory for the image
+        // Copy image to the device
+        /*uchar* d_img, d_imgOut;
+        cudaError_t err = cudaMalloc((void**) &d_img, im_size);
         if (err != cudaSuccess)
         {
-                cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
+                printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
                 exit(EXIT_FAILURE);
         }
+        cudaMemcpy(d_img, h_img, im_size, cudaMemcpyHostToDevice);
 
-        err = cudaMalloc((void**) &d_img_out, im_size);
+        // Create image in the device for the result image
+        err = cudaMalloc((void**) &d_imgOut, im_size);
         if (err != cudaSuccess)
         {
-                cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
+                printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
                 exit(EXIT_FAILURE);
-        }
+        }*/
 
-        // Copy image from host to device
-        err = cudaMemcpy(d_img_in, h_img, im_size, cudaMemcpyHostToDevice);
-        if (err != cudaSuccess)
-        {
-                cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
-                exit(EXIT_FAILURE);
-        }
-
-        // Launch the Kernel
-        dim3 dimGrid(ceil(cols / 256.0), ceil(rows / 256.0), 1);
+        //Kernel launch code
+        /*int cols = size.width;
+        int rows = size.height;
+        dim3 dimGrid(ceil(cols / 16.0), ceil(rows / 16.0), 1);
         dim3 dimBlock(16, 16, 1);
-        pictureKernel<<<dimGrid, dimBlock>>>(d_img_in, d_img_out, rows, cols);
+        pictureKernel<<<dimBlock, dimGrid>>>(d_img, d_imgOut, rows, cols);
 
-        // Copy result image from device to host
-        err = cudaMemcpy(h_result, d_img_out, im_size, cudaMemcpyDeviceToHost);
-        if (err != cudaSuccess)
-        {
-                cout << cudaGetErrorString(err) << " in " << __FILE__ << " at line " << __LINE__;
-                exit(EXIT_FAILURE);
-        }
-        Mat result(rows, cols, CV_8UC3, (void*) h_result);
+        // Copy result into the host from the device memory
+        cudaMemcpy(h_img, d_imgOut, im_size, cudaMemcpyDeviceToHost);
 
-        cout << "Success" << endl;
-        cudaFree(d_img_in);
-        cudaFree(d_img_out);*/
-        return result;
+        // Put the host image in a Mat container
+        Mat result(rows, cols / 3, CV_8UC3, (void*)h_img);
+
+        // Free memory
+        cudaFree(d_img);
+        cudaFree(d_imgOut);*/
+
+        return image;
 }
-
 
