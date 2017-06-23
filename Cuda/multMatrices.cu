@@ -4,13 +4,14 @@
 const long int M = 10;
 const long int N = 10;
 const long int O = 10;
+#define BLOCK_WIDTH 16
 
-void fillMatrix(long long int *A, long long int sizeA);
-void printMatrix(long long int *A, long long int sizeA, long long int N);
-long long int getValue(long long int *A, long long int i, long long int j, long long int cols);
-void setValue(long long int *A, long long int i, long long int j, long long int value);
-void multiMatricesCPU(long long int *A, long long int *B, long long int *C);
-void multiMatricesGPU(long long int *A, long long int *B, long long int *C);
+void fillMatrix(float *A, long long int sizeA);
+void printMatrix(float *A, long long int sizeA, long long int N);
+float getValue(float *A, long long int i, long long int j, long long int cols);
+void setValue(float *A, long long int i, long long int j, float value);
+void multiMatricesCPU(float *A, float *B, float *C);
+void multiMatricesGPU(float *A, float *B, float *C);
 
 int main(int argc, char const *argv[])
 {
@@ -20,9 +21,9 @@ int main(int argc, char const *argv[])
         long long int sizeC = M * O;
 
         //Creating the matrices
-        long long int A[sizeA];
-        long long int B[sizeB];
-        long long int C[sizeC];
+        float A[sizeA];
+        float B[sizeB];
+        float C[sizeC];
 
         //Filling the matrices with secuencial numbers
         fillMatrix(A, sizeA);
@@ -30,46 +31,62 @@ int main(int argc, char const *argv[])
         fillMatrix(C, sizeC);
 
         // Multiplying A and B
-        multiMatricesCPU(A, B, C);
+        //multiMatricesCPU(A, B, C);
+        multiMatricesGPU(A, B, C);
         //printMatrix(A, sizeA, N);
-        //printMatrix(C, sizeC, O);
+        printMatrix(C, sizeC, O);
         return 0;
 }
 
-// TODO write the kernel
+__global__ void matrixMultKernel (float *d_A, float *d_B, float *d_C, int N)
+{
+  // Calculate the row index of the d_C element and d_A
+  int row = blockIdx.y * blockDim.y + threadIdx.y;
 
-void fillMatrix(long long int *A, long long int sizeA)
+  // Calculate the column index of d_C and d_B
+  int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if ((row < N) && (col < N))
+  {
+    float Cvalue = 0;
+    for (int k = 0; k < N; k++)
+      Cvalue += d_A[row * N + k] * d_B[k * N + col];
+    d_C[row * N + col] = Cvalue;
+  }
+}
+
+void fillMatrix(float *A, long long int sizeA)
 {
         for (long long int i = 0; i < sizeA; i++)
                 A[i] = i+1;
 }
 
 // Get the value in the position (i, j) in matrix A
-long long int getValue(long long int *A, long long int i, long long int j, long long int cols)
+float getValue(float *A, long long int i, long long int j, long long int cols)
 {
         return A[cols * i + j];
 }
 
 // Set the value on the position (i, j) of matrix A
-void setValue(long long int *A, long long int i, long long int j, long long int value)
+void setValue(float *A, long long int i, long long int j, float value)
 {
         A[O * i + j] = value;
 }
 
 // Print the entire matrix A
-void printMatrix(long long int *A, long long int sizeA, long long int N)
+void printMatrix(float *A, long long int sizeA, long long int N)
 {
         for (long long int i = 0; i < sizeA; i++)
         {
                 if (i % N == 0 && i != 0)
                         printf("\n");
-                printf("%lld ", A[i]);
+                printf("%d ", (int) A[i]);
         }
         printf("\n");
 }
 
 // Computes the multiplications between matrices A and B and stores the result on Matrix C
-void multiMatricesCPU(long long int *A, long long int *B, long long int *C)
+void multiMatricesCPU(float *A, float *B, float *C)
 {
         long long int temp = 0;
         for (long long int i = 0; i < M; i++)
@@ -122,4 +139,16 @@ void multiMatricesGPU(float *h_A, float *h_B, float *h_C)
         }
 
         // Launch kernel
+        int NumBlocks = N / BLOCK_WIDTH;
+        if (N % BLOCK_WIDTH)
+                NumBlocks++;
+        dim3 dimGrid(NumBlocks, NumBlocks);
+        dim3 dimBlock(BLOCK_WIDTH, BLOCK_WIDTH);
+        matrixMultKernel<<<dimGrid, dimBlock>>>(d_A, d_B, d_C, N);
+
+        // Put results again on host conrainers
+        cudaMemcpy(h_C, d_C, C_size, cudaMemcpyDeviceToHost);
+        cudaFree(d_A);
+        cudaFree(d_B);
+        cudaFree(d_C);
 }
