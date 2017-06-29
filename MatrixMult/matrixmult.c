@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <time.h>
 
-const long int M = 100;
-const long int N = 100;
-const long int O = 24;
+const long int M = 10;
+const long int N = 10;
+const long int O = 10;
 
 void fillMatrix(long long int *A, long long int sizeA);
 void printMatrix(long long int *A, long long int sizeA, long long int N);
@@ -25,13 +25,13 @@ int main(int argc, char const *argv[])
 
   //Filling the matrices with secuencial numbers
   fillMatrix(A, sizeA);
-  //fillMatrix(B, sizeB);
-  //fillMatrix(C, sizeC);
+  fillMatrix(B, sizeB);
+  fillMatrix(C, sizeC);
 
   // Multiplying A and B
-  //multiMatrices(A, B, C);
-  //printMatrix(A, sizeA, N);
-  //printMatrix(C, sizeC, O);
+  multiMatrices(A, B, C);
+  printMatrix(A, sizeA, N);
+  printMatrix(C, sizeC, O);
   return 0;
 }
 
