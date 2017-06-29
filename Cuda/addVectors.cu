@@ -73,4 +73,3 @@ void sumVectors(float *A, float *B, float *C) {
   cudaFree(d_B);
   cudaFree(d_C);
 }
-
