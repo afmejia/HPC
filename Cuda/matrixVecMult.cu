@@ -106,4 +106,3 @@ void printVector(float *h_A, int size)
     printf("%d ", (int)h_A[i]);
   printf("\n");
 }
-
