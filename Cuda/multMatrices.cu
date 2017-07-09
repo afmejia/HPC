@@ -152,3 +152,4 @@ void multiMatricesGPU(float *h_A, float *h_B, float *h_C)
         cudaFree(d_B);
         cudaFree(d_C);
 }
+

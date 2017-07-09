@@ -53,8 +53,13 @@ int main(int argc, char const *argv[]) {
         return 0;
 }
 
+<<<<<<< HEAD
+__global__ void pictureKernel(uchar* d_img_in, uchar* d_img_out, int rows, int cols)
+{
+=======
 /*__global__ void pictureKernel(uchar* d_img_in, uchar* d_img_out, int rows, int cols)
    {
+>>>>>>> 9c34741928fa05cd2d29c6608c860598aa0796ee
         // Calculate the row # of the d_img element to process
         int row = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -64,7 +69,11 @@ int main(int argc, char const *argv[]) {
         // Each thread computes one element of d_img if in range
         if ((row < rows) && (col < cols))
                 d_img_out[row * cols + col] = 2 * d_img_in[row * cols + col];
+<<<<<<< HEAD
+}
+=======
    }*/
+>>>>>>> 9c34741928fa05cd2d29c6608c860598aa0796ee
 
 Mat& filter(Mat& image)
 {
@@ -91,6 +100,57 @@ Mat& gpuFilter(Mat& image, uchar* h_img, uchar* h_imgOut, Size size, int im_size
 
         // Create host image
         h_img = image.data;
+<<<<<<< HEAD
+
+        // Sequencial filter
+        /*for(int i = 0; i < im_size; i++)
+           {
+           h_imgOut[i] = 2 * h_img[i];
+           }
+           image.release();
+           image.create(size, CV_8UC3);
+           image.data = h_imgOut;*/
+
+        // Allocate device memory for the image
+        // Copy image to the device
+        uchar *d_img, *d_imgOut;
+        cudaError_t err = cudaMalloc((void**) &d_img, im_size);
+        if (err != cudaSuccess)
+        {
+                printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+        }
+        cudaMemcpy(d_img, h_img, im_size, cudaMemcpyHostToDevice);
+
+        // Create image in the device for the result image
+        err = cudaMalloc((void**) &d_imgOut, im_size);
+        if (err != cudaSuccess)
+        {
+                printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+        }
+
+        //Kernel launch code
+        int cols = size.width;
+        int rows = size.height;
+        dim3 dimGrid(ceil(cols / 16.0), ceil(rows / 16.0), 1);
+        dim3 dimBlock(16, 16, 1);
+        pictureKernel<<<dimBlock, dimGrid>>>(d_img, d_imgOut, rows, cols);
+
+        // Copy result into the host from the device memory
+        cudaMemcpy(h_imgOut, d_imgOut, im_size, cudaMemcpyDeviceToHost);
+
+        // Put the host image in a Mat container
+        image.release();
+        image.create(size, CV_8UC3);
+        image.data = h_imgOut;
+        Mat result(rows, cols / 3, CV_8UC3, (void*)h_img);
+
+        // Free memory
+        cudaFree(d_img);
+        cudaFree(d_imgOut);
+
+=======
         //Mat result;
         //result.create(size, CV_8UC3);
         //result.data = h_imgOut;
@@ -137,5 +197,6 @@ Mat& gpuFilter(Mat& image, uchar* h_img, uchar* h_imgOut, Size size, int im_size
            cudaFree(d_img);
            cudaFree(d_imgOut);*/
 
+>>>>>>> 9c34741928fa05cd2d29c6608c860598aa0796ee
         return image;
 }
